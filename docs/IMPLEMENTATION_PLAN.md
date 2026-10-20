@@ -22,7 +22,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 | One-Click Demo Credentials Available | Yes (`student@reviewportal.com`) | Yes (`mentor@reviewportal.com`) | Yes (`admin@reviewportal.com`) |
 | Submit New Project (Title, Repo, Live, Desc) | Yes | No | No |
 | Duplicate Repo URL Prevention | Yes (Enforced) | N/A | N/A |
-| Anti-Spam Rate Limit (Max 5 per 15 min) | Yes (Enforced) | N/A | N/A |
+| Anti-Spam Rate Limit (Max 3 per 2 min) | Yes (Enforced) | N/A | N/A |
 | View "My Submissions" & Mentor Notes | Yes | No | No |
 | View All Submissions (Server Paginated Table) | No | Yes | Yes |
 | Filter by Status (`PENDING`, `APPROVED`, `REJECTED`) | No | Yes (Server-side) | Yes (Server-side) |
@@ -57,7 +57,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
    - If a previous submission with that repository was `REJECTED`, the student is permitted to resubmit with an updated description and improvements.
 
 5. **Anti-Spam Rate Limiting**:
-   - `express-rate-limit` middleware restricts `POST /api/v1/projects` to a maximum of 5 submissions per 15 minutes per IP/User to protect the platform against bot flooding.
+   - `express-rate-limit` middleware restricts `POST /api/v1/projects` to a maximum of 3 submissions per 2 minutes per IP/User to protect the platform against bot flooding.
 
 6. **Review Notes / Feedback**:
    - Mentors submit feedback notes alongside their approval or rejection decision. The student can view these notes on their submissions dashboard.
@@ -182,13 +182,22 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
   - Create submission rate limiter:
     ```typescript
     export const submissionRateLimiter = rateLimit({
-      windowMs: 5 * 60 * 1000, // 5 minutes
-      max: 5, // max 5 submissions per window
+      windowMs: 2 * 60 * 1000, // 2-minute rolling window
+      max: 3, // Allow up to 3 submissions per window
       standardHeaders: true,
       legacyHeaders: false,
-      message: {
-        success: false,
-        message: "Too many project submissions from this IP. Please wait 10 minutes before submitting again."
+      keyGenerator: (req) => (req as any).user?.id || req.ip || "anonymous",
+      handler: (req, res) => {
+        const resetTime = (req as any).rateLimit?.resetTime;
+        const remainingSeconds = resetTime
+          ? Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000))
+          : 120;
+        res.status(httpStatus.TOO_MANY_REQUESTS).json({
+          success: false,
+          statusCode: httpStatus.TOO_MANY_REQUESTS,
+          message: `Submission limit reached (maximum 3 projects per 2 minutes). Please try again in ${remainingSeconds} seconds.`,
+          retryAfterSeconds: remainingSeconds
+        });
       }
     });
     ```

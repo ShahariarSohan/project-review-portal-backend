@@ -34,7 +34,7 @@ This document defines the non-negotiable engineering principles, code organizati
 - **Mentor Creation Rule**: Mentors cannot self-register. Only `ADMIN` can create Mentors or promote existing users. An initial Mentor account is pre-seeded on startup for evaluation convenience.
 - **Student Registration (No OTP)**: Student signup creates verified, active accounts (`isVerified: true`) immediately and issues JWT tokens to eliminate email friction during evaluation.
 - **Duplicate Submission Rule**: Block duplicate repository submissions if the student already has an active `PENDING` or `APPROVED` project with that `repoUrl` (HTTP 409 Conflict). If a previous submission was `REJECTED`, the student is permitted to resubmit improvements.
-- **Anti-Spam Rate Limiting**: `express-rate-limit` enforces a maximum of 5 project submissions per 10-minute window per IP/user (HTTP 429 Too Many Requests).
+- **Anti-Spam Rate Limiting**: `express-rate-limit` enforces a maximum of 3 project submissions per 2-minute window keyed by authenticated user ID with IP fallback. Returns HTTP 429 with RFC RateLimit headers and dynamic seconds countdown.
 - **Settings Page Rule**: The settings page displays user profile identity (Email, Role, Status) in a read-only manner. Password modification is strictly disabled.
 
 ---
@@ -84,7 +84,19 @@ This document defines the non-negotiable engineering principles, code organizati
 
 ---
 
-## 7. Execution Phasing Protocol
+---
+
+## 8. Zero Dead Code & Unused Feature Pruning Protocol
+
+- **Mandatory Dead Code Elimination**: No unused models, dead utility files, obsolete endpoints, or zombie functions are permitted in the codebase.
+- **Pre-Removal Analysis Rule**: Before deleting any code, trace all imports, callers, and database relations to verify that it is 100% unused and does not break active dependencies.
+- **Prune Boilerplate Artifacts**:
+  - Remove deprecated Prisma models (e.g., model Otp) that are not part of the active system.
+  - Remove dead utility files (e.g., unused email sending or OTP verification scripts) that belong to superseded features.
+  - Remove orphaned routes, controllers, and validation schemas.
+- **Cleanliness Standard**: Never leave dead code "for later" or commented-out legacy blocks. An engineered codebase must be lean, intentional, and immediately understandable to any reviewer.
+
+## 9. Execution Phasing Protocol
 
 - Code must be implemented **one feature at a time**.
 - Before proceeding to the next feature:

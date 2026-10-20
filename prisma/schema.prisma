@@ -11,14 +11,21 @@ datasource db {
 // ENUMS
 // ---------------------------------------------------------
 enum UserRole {
-  USER
   ADMIN
+  MENTOR
+  STUDENT
 }
 
 enum UserStatus {
   ACTIVE
   SUSPENDED
   BANNED
+}
+
+enum ProjectStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ---------------------------------------------------------
@@ -34,24 +41,39 @@ model User {
   profileImage String?
   coverImage   String?
   bio          String?
-  role         UserRole   @default(USER)
+  role         UserRole   @default(STUDENT)
   status       UserStatus @default(ACTIVE)
-  isVerified   Boolean    @default(false)
+  isVerified   Boolean    @default(true)
   isDeleted    Boolean    @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
+  projectsSubmitted Project[] @relation("StudentProjects")
+  projectsReviewed  Project[] @relation("ReviewedProjects")
+
   @@map("users")
 }
 
-model Otp {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  otp       Int
-  expiry    DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+model Project {
+  id          String        @id @default(uuid())
+  title       String
+  repoUrl     String
+  liveUrl     String?
+  description String        @db.Text
+  status      ProjectStatus @default(PENDING)
+  reviewNotes String?       @db.Text
 
-  @@index([expiry])
-  @@map("otps")
+  studentId   String
+  student     User          @relation("StudentProjects", fields: [studentId], references: [id], onDelete: Cascade)
+
+  reviewerId  String?
+  reviewer    User?         @relation("ReviewedProjects", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([studentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("projects")
 }
