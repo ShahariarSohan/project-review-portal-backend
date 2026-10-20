@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router } from "express";
 import { authRoutes } from "../modules/auth/auth.route";
+import { projectRoutes } from "../modules/project/project.route";
 
 export const router = Router();
 
@@ -13,6 +14,10 @@ const moduleRoutes: IModuleRoutes[] = [
   {
     path: "/auth",
     route: authRoutes,
+  },
+  {
+    path: "/projects",
+    route: projectRoutes,
   },
 ];
 
