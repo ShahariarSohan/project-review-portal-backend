@@ -9,7 +9,7 @@ import {
 } from "./project.interface";
 
 const createProject = async (studentId: string, payload: ICreateProjectPayload) => {
-  // Enforce duplicate prevention: Cannot submit same repo while PENDING or APPROVED
+
   const activeDuplicate = await prisma.project.findFirst({
     where: {
       studentId,
@@ -142,6 +142,13 @@ const reviewProject = async (
   const existing = await prisma.project.findUnique({ where: { id: projectId } });
   if (!existing) {
     throw new AppError(httpStatus.NOT_FOUND, "Target project not found");
+  }
+
+  if (existing.status !== ProjectStatus.PENDING) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "This project has already been reviewed. Review decisions are final and cannot be modified."
+    );
   }
 
   const updated = await prisma.project.update({

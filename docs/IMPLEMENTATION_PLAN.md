@@ -27,11 +27,13 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 | View All Submissions (Server Paginated Table) | No | Yes | Yes |
 | Filter by Status (`PENDING`, `APPROVED`, `REJECTED`) | No | Yes (Server-side) | Yes (Server-side) |
 | Search Submissions by Title, Student Name/Email | No | Yes (Server-side) | Yes (Server-side) |
-| Approve / Reject Submission with Review Notes | No | Yes | Yes |
+| Approve / Reject Submission with Review Notes | No | Yes (Once only) | Yes (Once only) |
+| One-Time Final Review Decision (Immutable after review) | N/A | Yes (Enforced) | Yes (Enforced) |
 | View Aggregated Platform / Review Statistics | No (Only Personal Stats) | Yes | Yes |
 | View Full User Directory (Students, Mentors, Admins)| No | No | Yes |
 | Create New Mentor (`POST /api/v1/users/mentor`) | No | No | Yes |
-| Promote User to `MENTOR` Role | No | No | Yes |
+| Promote User / Change Role | No | No | No (Disabled: Roles are immutable) |
+| Manage User Account Status (`ACTIVE`, `SUSPENDED`, `BANNED`) | No | No | Yes |
 | View Profile Details (Email, Role, Status) in Settings | Yes (Read-only) | Yes (Read-only) | Yes (Read-only) |
 | Change Password in Settings | No (Disabled) | No (Disabled) | No (Disabled) |
 
@@ -40,7 +42,8 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 ## 3. Ambiguity Resolutions
 
 1. **Who Creates the Mentor?**:
-   - **The ADMIN**: Mentors cannot be created by students or public registration. In `/dashboard/users`, the Admin has an **"Add Mentor"** dialog (`POST /api/v1/users/mentor`) where Admin inputs Name, Email, and Password. In addition, Admin can click **"Promote to Mentor"** on any existing user.
+   - **The ADMIN**: Mentors cannot be created by students or public registration. In `/dashboard/users`, the Admin has an **"Add Mentor"** dialog (`POST /api/v1/users/mentor`) where Admin inputs Name, Email, and Password.
+   - **Role Mutation Disabled**: Per product specifications, role changing / promoting existing accounts across roles is strictly disabled; roles are immutable once registered or created.
    - **Startup Seeding for Evaluation**: For immediate assessment grading, backend startup automatically seeds an initial Mentor (`mentor@reviewportal.com` / `Mentor123`), alongside the Admin and sample Student.
 
 2. **Pre-Seeded Student & Signup Option**:
@@ -60,7 +63,11 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
    - `express-rate-limit` middleware restricts `POST /api/v1/projects` to a maximum of 3 submissions per 2 minutes per IP/User to protect the platform against bot flooding.
 
 6. **Review Notes / Feedback**:
-   - Mentors submit feedback notes alongside their approval or rejection decision. The student can view these notes on their submissions dashboard.
+   - Mentors and Admins submit feedback notes alongside their approval or rejection decision. The student can view these notes on their submissions dashboard.
+
+7. **One-Time Final Review Decision Protocol**:
+   - An evaluation decision (`APPROVED` or `REJECTED`) is one-time and final. Once recorded, it cannot be modified or re-reviewed by any mentor or admin.
+   - If a request is made to review an already-decided project, the backend returns HTTP 400 Bad Request with a clear message indicating the review decision is finalized.
 
 ---
 
@@ -253,6 +260,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
   - `reviewProject(projectId, reviewerId, payload)`:
     - `payload`: `{ status: "APPROVED" | "REJECTED", reviewNotes?: string }`
     - Verifies project exists.
+    - **One-Time Decision Enforcement**: Validates that `existing.status === ProjectStatus.PENDING`. If `existing.status !== ProjectStatus.PENDING`, throws `AppError(httpStatus.BAD_REQUEST, "This project has already been reviewed. Review decisions are final and cannot be modified.")`.
     - Updates project `status`, sets `reviewerId`, updates `reviewNotes`, sets `updatedAt = new Date()`.
     - Returns updated project.
 - **File**: `src/app/modules/project/project.controller.ts` & `project.route.ts`:
@@ -263,7 +271,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 ---
 
 ### Feature 5: Admin User Directory & Mentor Creation API (Admin View)
-**Goal**: Enable Admins to view the platform user directory, create new Mentors, and promote existing users to Mentors.
+**Goal**: Enable Admins to view the platform user directory, search and filter accounts, manage account status (`ACTIVE`, `SUSPENDED`, `BANNED`), and create new Mentors. Role changes on existing accounts are disabled.
 
 - **File**: `src/app/modules/user/user.validation.ts`
   - `createMentorZodSchema`:
@@ -274,6 +282,12 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
       password: z.string().min(6, "Password must be at least 6 characters")
     });
     ```
+  - `updateUserStatusZodSchema`:
+    ```typescript
+    export const updateUserStatusZodSchema = z.object({
+      status: z.enum(["ACTIVE", "SUSPENDED", "BANNED"])
+    });
+    ```
 - **File**: `src/app/modules/user/user.service.ts`
   - `createMentor(payload)`:
     - Validates email is not already registered.
@@ -282,17 +296,14 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
     - Returns created user without password.
   - `getAllUsers(filters, paginationOptions)`:
     - Returns paginated list of all users excluding password hashes.
-    - Supports search by name/email and filter by role.
-  - `updateUserRole(userId, newRole)`:
-    - Validates `newRole IN ['ADMIN', 'MENTOR', 'STUDENT']`.
-    - Updates user role.
-    - Returns updated user.
+    - Supports search by name/email and filter by role and status.
   - `updateUserStatus(userId, status)`:
-    - Allows admin to set status to `ACTIVE` or `BLOCKED`.
+    - Allows admin to set status to `ACTIVE`, `SUSPENDED`, or `BANNED`.
+    - Verifies user exists. Cannot suspend the primary seed admin.
+    - Returns updated user.
 - **File**: `src/app/modules/user/user.controller.ts` & `user.route.ts`:
   - `POST /api/v1/users/mentor`: Protected with `authGuard(UserRole.ADMIN)` -> calls `createMentor`
   - `GET /api/v1/users`: Protected with `authGuard(UserRole.ADMIN)` -> calls `getAllUsers`
-  - `PATCH /api/v1/users/:id/role`: Protected with `authGuard(UserRole.ADMIN)` -> calls `updateUserRole`
   - `PATCH /api/v1/users/:id/status`: Protected with `authGuard(UserRole.ADMIN)` -> calls `updateUserStatus`
 - Mount `/api/v1/users` in `src/app/routes/index.ts`.
 
