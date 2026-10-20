@@ -1,0 +1,50 @@
+{
+  "name": "project-review-portal-backend",
+  "version": "1.0.0",
+  "description": "REST API for Project Review Portal with JWT auth, RBAC, and PostgreSQL",
+  "main": "index.js",
+  "prisma": {
+    "schema": "./prisma/schema.prisma"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only ./src/server.ts",
+    "postinstall": "prisma generate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@prisma/client": "^6.19.2",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.10.2",
+    "@types/nodemailer": "^7.0.5",
+    "eslint": "^9.39.1",
+    "prisma": "^6.19.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.48.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "http-status": "^2.1.0",
+    "http-status-codes": "^2.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.12",
+    "zod": "^3.24.2"
+  }
+}
