@@ -96,17 +96,10 @@ const loginUser = async (payload: { email: string; password: string }) => {
     throw new AppError(httpStatus.FORBIDDEN, "This account has been deleted.");
   }
 
-  if (userData.status === "SUSPENDED") {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Your account has been suspended. Please contact support."
-    );
-  }
-
   if (userData.status === "BANNED") {
     throw new AppError(
       httpStatus.FORBIDDEN,
-      "Your account has been permanently banned."
+      "Your account has been permanently banned. Access is revoked."
     );
   }
 

@@ -21,27 +21,60 @@ const createProject = async (studentId: string, payload: ICreateProjectPayload) 
     );
   }
 
+  const trimmedTitle = payload.title.trim();
+  const trimmedRepo = payload.repoUrl.trim();
+  const trimmedLive = payload.liveUrl.trim();
+
   const activeDuplicate = await prisma.project.findFirst({
     where: {
       studentId,
-      repoUrl: payload.repoUrl,
       status: { in: [ProjectStatus.PENDING, ProjectStatus.APPROVED] },
+      OR: [
+        {
+          title: { equals: trimmedTitle, mode: "insensitive" },
+        },
+        {
+          repoUrl: { equals: trimmedRepo, mode: "insensitive" },
+        },
+        {
+          liveUrl: { equals: trimmedLive, mode: "insensitive" },
+        },
+      ],
     },
   });
 
   if (activeDuplicate) {
+    const isTitleMatch =
+      activeDuplicate.title.trim().toLowerCase() === trimmedTitle.toLowerCase();
+    const isRepoMatch =
+      activeDuplicate.repoUrl.trim().toLowerCase() === trimmedRepo.toLowerCase();
+    const isLiveMatch = Boolean(
+      activeDuplicate.liveUrl &&
+        activeDuplicate.liveUrl.trim().toLowerCase() === trimmedLive.toLowerCase()
+    );
+
+    const conflictingFields: string[] = [];
+    if (isTitleMatch) conflictingFields.push("project title");
+    if (isRepoMatch) conflictingFields.push("repository URL");
+    if (isLiveMatch) conflictingFields.push("live demo URL");
+
+    const fieldsText =
+      conflictingFields.length > 0
+        ? conflictingFields.join(" and ")
+        : "project attributes";
+
     throw new AppError(
       httpStatus.CONFLICT,
-      "You already have an active or approved submission for this repository URL."
+      `You already have an active or approved submission with this ${fieldsText}. Duplicate submissions are not allowed.`
     );
   }
 
   const project = await prisma.project.create({
     data: {
-      title: payload.title,
-      repoUrl: payload.repoUrl,
-      liveUrl: payload.liveUrl?.trim() || null,
-      description: payload.description,
+      title: trimmedTitle,
+      repoUrl: trimmedRepo,
+      liveUrl: trimmedLive,
+      description: payload.description.trim(),
       status: ProjectStatus.PENDING,
       studentId,
     },

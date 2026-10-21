@@ -22,26 +22,26 @@ router.post(
 
 router.get(
   "/my-submissions",
-  authGuard(UserRole.STUDENT),
+  authGuard(UserRole.STUDENT, { allowSuspended: true }),
   projectController.getMySubmissionsController
 );
 
 router.get(
   "/my-stats",
-  authGuard(UserRole.STUDENT),
+  authGuard(UserRole.STUDENT, { allowSuspended: true }),
   projectController.getMyStatsController
 );
 
 // Mentor & Admin routes
 router.get(
   "/stats",
-  authGuard(UserRole.MENTOR, UserRole.ADMIN),
+  authGuard(UserRole.MENTOR, UserRole.ADMIN, { allowSuspended: true }),
   projectController.getProjectStatsController
 );
 
 router.get(
   "/",
-  authGuard(UserRole.MENTOR, UserRole.ADMIN),
+  authGuard(UserRole.MENTOR, UserRole.ADMIN, { allowSuspended: true }),
   projectController.getAllProjectsController
 );
 

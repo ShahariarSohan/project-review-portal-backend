@@ -15,9 +15,7 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      callback(null, true);
-    },
+    origin: ['http://localhost:3000'],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

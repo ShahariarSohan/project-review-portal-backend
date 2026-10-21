@@ -10,6 +10,7 @@ import { prisma } from "../config/prisma";
 
 export interface IAuthGuardOptions {
   allowSuspended?: boolean;
+  allowBanned?: boolean;
 }
 
 const authGuard = (...args: (UserRole | IAuthGuardOptions)[]) => {
@@ -62,14 +63,12 @@ const authGuard = (...args: (UserRole | IAuthGuardOptions)[]) => {
         throw new AppError(httpStatus.FORBIDDEN, "This account has been deleted.");
       }
 
-      if (!options?.allowSuspended) {
-        if (dbUser.status === "SUSPENDED") {
-          throw new AppError(httpStatus.FORBIDDEN, "Your account has been suspended. Please contact support.");
-        }
+      if (dbUser.status === "BANNED" && !options?.allowBanned) {
+        throw new AppError(httpStatus.FORBIDDEN, "Your account has been permanently banned. Access is revoked.");
+      }
 
-        if (dbUser.status === "BANNED") {
-          throw new AppError(httpStatus.FORBIDDEN, "Your account has been permanently banned.");
-        }
+      if (dbUser.status === "SUSPENDED" && !options?.allowSuspended) {
+        throw new AppError(httpStatus.FORBIDDEN, "Your account has been suspended. Please contact support.");
       }
 
       req.user = { ...verifiedUser, role: dbUser.role, status: dbUser.status };

@@ -15,12 +15,11 @@ export const createProjectZodSchema = z.object({
       "Must be a valid GitHub repository URL (e.g., https://github.com/owner/repo)"
     ),
   liveUrl: z
-    .string()
+    .string({ required_error: "Live demo URL is required" })
     .trim()
+    .min(1, "Live demo URL is required")
     .url("Please provide a valid URL")
-    .regex(/^https:\/\//, "Live demo link must use secure https:// protocol")
-    .optional()
-    .or(z.literal("")),
+    .regex(/^https:\/\/.+/, "Live demo link must use secure https:// protocol"),
   description: z
     .string({ required_error: "Project description is required" })
     .trim()

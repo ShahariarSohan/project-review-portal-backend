@@ -69,6 +69,18 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
    - An evaluation decision (`APPROVED` or `REJECTED`) is one-time and final. Once recorded, it cannot be modified or re-reviewed by any mentor or admin.
    - If a request is made to review an already-decided project, the backend returns HTTP 400 Bad Request with a clear message indicating the review decision is finalized.
 
+8. **Account Suspension vs Banning Protocol**:
+   - **`BANNED` (Hard Revocation / Total Expulsion)**:
+     - User is completely denied entry into the platform.
+     - `POST /api/v1/auth/login` immediately rejects banned credentials with HTTP 403 Forbidden (`"Your account has been permanently banned. Access is revoked."`).
+     - Any active tokens encountering `authGuard` are blocked with HTTP 403 Forbidden.
+   - **`SUSPENDED` (Pattern A: Read-Only Access & Transparent Evaluation)**:
+     - Suspended users (students or mentors) are permitted to authenticate and access their dashboard.
+     - They have read-only access to view historical data (`GET /my-submissions`, `GET /my-stats`, `GET /projects`, `GET /projects/stats`).
+     - All mutation actions are strictly blocked on the backend:
+       - Suspended students cannot submit new projects (`POST /api/v1/projects` returns HTTP 403 Forbidden).
+       - Suspended mentors cannot review submissions (`PATCH /api/v1/projects/:id/review` returns HTTP 403 Forbidden).
+
 ---
 
 ## 4. Feature-by-Feature Implementation Sequence
@@ -214,14 +226,18 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
     export const createProjectZodSchema = z.object({
       title: z.string().min(3, "Title must be at least 3 characters").max(100),
       repoUrl: z.string().url("Invalid URL").regex(/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/, "Must be a valid GitHub repository URL"),
-      liveUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
+      liveUrl: z.string().url("Invalid URL").regex(/^https:\/\/.+/, "Live demo link must use secure https:// protocol"),
       description: z.string().min(20, "Description must be at least 20 characters").max(3000)
     });
     ```
 - **File**: `src/app/modules/project/project.service.ts`
   - `createProject(studentId, payload)`:
-    - Check if an active project with the identical `repoUrl` already exists for this `studentId` where `status IN ['PENDING', 'APPROVED']`.
-    - If found: throw `AppError(httpStatus.CONFLICT, "You have already submitted this repository URL. An active or approved submission already exists.")`.
+    - Enforce mandatory `liveUrl`.
+    - **Strict Multi-Field Duplicate Prevention**: Query active/approved projects for `studentId` with `status IN ['PENDING', 'APPROVED']` checking for duplicates across:
+      - `title` (case-insensitive exact match)
+      - `repoUrl` (case-insensitive exact match)
+      - `liveUrl` (case-insensitive exact match)
+    - If any match is found, reject with HTTP 409 Conflict detailing which specific field(s) conflicted.
     - Insert project into database with status `PENDING`.
     - Return created project.
   - `getMySubmissions(studentId)`:

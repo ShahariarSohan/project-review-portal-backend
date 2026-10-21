@@ -1,7 +1,7 @@
 export interface ICreateProjectPayload {
   title: string;
   repoUrl: string;
-  liveUrl?: string;
+  liveUrl: string;
   description: string;
 }
 
