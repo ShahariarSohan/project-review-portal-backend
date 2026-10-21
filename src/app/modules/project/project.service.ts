@@ -86,16 +86,52 @@ const createProject = async (studentId: string, payload: ICreateProjectPayload) 
   return project;
 };
 
-const getMySubmissions = async (studentId: string) => {
-  const submissions = await prisma.project.findMany({
-    where: { studentId },
-    include: {
-      reviewer: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+const getMySubmissions = async (studentId: string, filters: IProjectFilterQuery = {}) => {
+  const page = Math.max(1, Number(filters.page) || 1);
+  const limit = Math.max(1, Math.min(50, Number(filters.limit) || 10));
+  const skip = (page - 1) * limit;
 
-  return submissions;
+  const andConditions: Prisma.ProjectWhereInput[] = [{ studentId }];
+
+  if (filters.status && filters.status !== "ALL") {
+    andConditions.push({ status: filters.status as ProjectStatus });
+  }
+
+  if (filters.searchTerm?.trim()) {
+    const term = filters.searchTerm.trim();
+    andConditions.push({
+      OR: [
+        { title: { contains: term, mode: "insensitive" } },
+        { description: { contains: term, mode: "insensitive" } },
+        { repoUrl: { contains: term, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  const whereCondition: Prisma.ProjectWhereInput = { AND: andConditions };
+
+  const [total, submissions] = await Promise.all([
+    prisma.project.count({ where: whereCondition }),
+    prisma.project.findMany({
+      where: whereCondition,
+      skip,
+      take: limit,
+      include: {
+        reviewer: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: submissions,
+  };
 };
 
 const getMyStats = async (studentId: string) => {

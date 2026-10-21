@@ -18,13 +18,14 @@ const createProjectController = catchAsync(async (req: Request, res: Response) =
 
 const getMySubmissionsController = catchAsync(async (req: Request, res: Response) => {
   const studentId = req.user.id;
-  const result = await projectService.getMySubmissions(studentId);
+  const result = await projectService.getMySubmissions(studentId, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "My submissions retrieved successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
