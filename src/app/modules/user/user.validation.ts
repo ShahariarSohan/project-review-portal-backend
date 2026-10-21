@@ -12,7 +12,8 @@ export const createMentorZodSchema = z.object({
     .email("Please provide a valid email address"),
   password: z
     .string({ required_error: "Password is required" })
-    .min(6, "Password must be at least 6 characters"),
+    .min(8, "Password must be at least 8 characters")
+    .max(15, "Password cannot exceed 15 characters"),
 });
 
 export const updateUserStatusZodSchema = z.object({
