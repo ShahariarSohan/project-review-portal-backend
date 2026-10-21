@@ -19,6 +19,12 @@ router.post(
 );
 
 router.get(
+  "/stats",
+  authGuard(UserRole.ADMIN),
+  userController.getUserStatsController
+);
+
+router.get(
   "/",
   authGuard(UserRole.ADMIN),
   userController.getAllUsersController

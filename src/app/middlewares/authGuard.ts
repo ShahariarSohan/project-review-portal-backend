@@ -8,7 +8,22 @@ import { envVariables } from "../config/env";
 import { UserRole } from "../interfaces/userRole";
 import { prisma } from "../config/prisma";
 
-const authGuard = (...roles: UserRole[]) => {
+export interface IAuthGuardOptions {
+  allowSuspended?: boolean;
+}
+
+const authGuard = (...args: (UserRole | IAuthGuardOptions)[]) => {
+  let options: IAuthGuardOptions | undefined;
+  const roles: UserRole[] = [];
+
+  for (const arg of args) {
+    if (typeof arg === "object" && arg !== null) {
+      options = arg;
+    } else if (typeof arg === "string") {
+      roles.push(arg);
+    }
+  }
+
   return async (
     req: Request & { user?: any },
     res: Response,
@@ -47,15 +62,17 @@ const authGuard = (...roles: UserRole[]) => {
         throw new AppError(httpStatus.FORBIDDEN, "This account has been deleted.");
       }
 
-      if (dbUser.status === "SUSPENDED") {
-        throw new AppError(httpStatus.FORBIDDEN, "Your account has been suspended. Please contact support.");
+      if (!options?.allowSuspended) {
+        if (dbUser.status === "SUSPENDED") {
+          throw new AppError(httpStatus.FORBIDDEN, "Your account has been suspended. Please contact support.");
+        }
+
+        if (dbUser.status === "BANNED") {
+          throw new AppError(httpStatus.FORBIDDEN, "Your account has been permanently banned.");
+        }
       }
 
-      if (dbUser.status === "BANNED") {
-        throw new AppError(httpStatus.FORBIDDEN, "Your account has been permanently banned.");
-      }
-
-      req.user = { ...verifiedUser, role: dbUser.role };
+      req.user = { ...verifiedUser, role: dbUser.role, status: dbUser.status };
       const userRole = dbUser.role.toUpperCase();
       
       if (roles.length && !roles.some((r) => r.toUpperCase() === userRole)) {

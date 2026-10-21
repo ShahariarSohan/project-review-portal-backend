@@ -103,3 +103,10 @@ This document defines the non-negotiable engineering principles, code organizati
   1. Compile and type-check with `npx tsc --noEmit`.
   2. Verify endpoint behavior and database state.
   3. Await user review and confirmation before starting the next feature.
+
+---
+
+## 10. Git Push Restriction Protocol
+
+- **Zero Autonomous Git Pushes**: AI agents and automated scripts must **NEVER** run `git push` to GitHub or any remote repository.
+- **Manual User Push Only**: All remote synchronization (`git push origin main` or other branches) must be performed manually by the repository owner from their terminal. Agents are only permitted to make local commits (`git commit`) when appropriate.

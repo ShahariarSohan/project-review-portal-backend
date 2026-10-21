@@ -44,8 +44,20 @@ const updateUserStatusController = catchAsync(async (req: Request, res: Response
   });
 });
 
+const getUserStatsController = catchAsync(async (_req: Request, res: Response) => {
+  const result = await userService.getUserStats();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User directory statistics retrieved successfully",
+    data: result,
+  });
+});
+
 export const userController = {
   createMentorController,
   getAllUsersController,
   updateUserStatusController,
+  getUserStatsController,
 };

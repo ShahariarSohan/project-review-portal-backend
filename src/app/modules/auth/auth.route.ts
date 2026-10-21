@@ -13,8 +13,8 @@ const router = Router();
 router.post("/register", validateRequest(registerZodSchema), authController.registerUserController);
 router.post("/signup", validateRequest(registerZodSchema), authController.registerUserController);
 router.post("/login", validateRequest(loginZodSchema), authController.loginUser);
-router.post("/logout", authGuard(), authController.logoutUser);
-router.get("/me", authGuard(), authController.getMe);
+router.post("/logout", authGuard({ allowSuspended: true }), authController.logoutUser);
+router.get("/me", authGuard({ allowSuspended: true }), authController.getMe);
 router.post("/change-password", authGuard(), validateRequest(changePassword), authController.changePassword);
 
 export const authRoutes = router;

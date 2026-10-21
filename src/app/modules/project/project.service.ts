@@ -9,6 +9,17 @@ import {
 } from "./project.interface";
 
 const createProject = async (studentId: string, payload: ICreateProjectPayload) => {
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: { status: true },
+  });
+
+  if (!student || student.status !== "ACTIVE") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      `Your account has been ${student?.status?.toLowerCase() || "restricted"}. You are restricted from submitting projects.`
+    );
+  }
 
   const activeDuplicate = await prisma.project.findFirst({
     where: {
@@ -139,6 +150,18 @@ const reviewProject = async (
   reviewerId: string,
   payload: IReviewProjectPayload
 ) => {
+  const reviewer = await prisma.user.findUnique({
+    where: { id: reviewerId },
+    select: { status: true },
+  });
+
+  if (!reviewer || reviewer.status !== "ACTIVE") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      `Your account has been ${reviewer?.status?.toLowerCase() || "restricted"}. You are restricted from evaluating projects.`
+    );
+  }
+
   const existing = await prisma.project.findUnique({ where: { id: projectId } });
   if (!existing) {
     throw new AppError(httpStatus.NOT_FOUND, "Target project not found");

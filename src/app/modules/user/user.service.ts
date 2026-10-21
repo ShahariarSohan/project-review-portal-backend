@@ -164,8 +164,51 @@ const updateUserStatus = async (
   return updatedUser;
 };
 
+const getUserStats = async () => {
+  const [
+    total,
+    active,
+    suspended,
+    banned,
+    mentors,
+    students,
+    admins,
+  ] = await Promise.all([
+    prisma.user.count({ where: { isDeleted: false } }),
+    prisma.user.count({
+      where: { isDeleted: false, status: UserStatus.ACTIVE },
+    }),
+    prisma.user.count({
+      where: { isDeleted: false, status: UserStatus.SUSPENDED },
+    }),
+    prisma.user.count({
+      where: { isDeleted: false, status: UserStatus.BANNED },
+    }),
+    prisma.user.count({
+      where: { isDeleted: false, role: UserRole.MENTOR },
+    }),
+    prisma.user.count({
+      where: { isDeleted: false, role: UserRole.STUDENT },
+    }),
+    prisma.user.count({
+      where: { isDeleted: false, role: UserRole.ADMIN },
+    }),
+  ]);
+
+  return {
+    total,
+    active,
+    suspended,
+    banned,
+    mentors,
+    students,
+    admins,
+  };
+};
+
 export const userService = {
   createMentor,
   getAllUsers,
   updateUserStatus,
+  getUserStats,
 };
