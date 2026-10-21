@@ -1,6 +1,14 @@
 # Project Review Portal - Backend API
 
-RESTful API backend for an academic and technical project submission and review platform. The service manages authentication with JSON Web Tokens (JWT) and HTTP-only cookies, role-based access control (RBAC) across three distinct user roles (Admin, Mentor, Student), project submission intake with duplicate prevention and anti-spam rate limiting, immutable evaluation workflows, and account governance with PostgreSQL and Prisma ORM.
+RESTful API backend for an academic and technical project submission and review platform. The service manages authentication with JSON Web Tokens (JWT) and HTTP-only cookies, role-based access control (RBAC) across three distinct user roles (Admin, Mentor, Student), project intake with strict multi-field duplicate prevention and anti-spam rate limiting, immutable evaluation workflows, and account governance with PostgreSQL and Prisma ORM.
+
+---
+
+## Live Deployments
+
+- **Production API URL**: https://project-review-portal-backend.vercel.app
+- **Production Web Client**: https://project-review-portal-frontend.vercel.app
+- **Health Check Endpoint**: `GET https://project-review-portal-backend.vercel.app/`
 
 ---
 
@@ -25,7 +33,8 @@ The system enforces three explicit roles (`ADMIN`, `MENTOR`, `STUDENT`) via midd
 | Public Student Registration (`POST /auth/signup`) | Yes | No | No |
 | One-Click Demo Accounts Pre-Seeded | Yes | Yes | Yes |
 | Submit New Project (`POST /projects`) | Yes | No | No |
-| Duplicate Repo Prevention (Active PENDING/APPROVED) | Enforced | N/A | N/A |
+| Strict Multi-Field Duplicate Prevention (Title, Repo, Live) | Enforced | N/A | N/A |
+| Mandatory Live Demo Link (Secure HTTPS) | Enforced | N/A | N/A |
 | Submission Anti-Spam Rate Limiter (Max 3 / 2 min) | Enforced | N/A | N/A |
 | View Personal Submissions (`GET /projects/my-submissions`) | Yes | No | No |
 | View Personal Statistics (`GET /projects/my-stats`) | Yes | No | No |
@@ -44,12 +53,82 @@ The system enforces three explicit roles (`ADMIN`, `MENTOR`, `STUDENT`) via midd
 
 ---
 
+## Strict Business Rules and Domain Enforcements
+
+The backend enforces strict operational boundaries to protect data integrity, prevent spam, and maintain evaluation accountability:
+
+### 1. Strict Multi-Field Duplicate Prevention (HTTP 409 Conflict)
+
+To prevent duplicate submissions while preserving fair resubmissions:
+
+- **Active Submission Scope**: When a student submits a project via `POST /api/v1/projects`, the service queries existing projects for that `studentId` where `status IN ('PENDING', 'APPROVED')`.
+- **Three-Field Exact Match Detection**: The query executes a case-insensitive check across three distinct fields:
+  1. `title`: Compares trimmed project title against existing active submissions.
+  2. `repoUrl`: Compares trimmed repository URL against existing active submissions.
+  3. `liveUrl`: Compares trimmed live demo URL against existing active submissions.
+- **Dynamic Conflict Reporting**: If any match is detected, the API rejects the request with an `HTTP 409 Conflict` status code and dynamically lists every conflicting field in the error message:
+  ```json
+  {
+    "success": false,
+    "message": "You already have an active or approved submission with this project title and repository URL. Duplicate submissions are not allowed."
+  }
+  ```
+- **Fair Resubmission Policy**: If a student's prior project was marked `REJECTED`, the repository, title, and live URL are freed from the duplicate block, allowing the student to revise and resubmit their improved project.
+
+### 2. Strict Input Validation (Zod Schema Enforcement)
+
+All payload fields for project submission are strictly validated before database insertion:
+
+| Field | Type | Validation Rules | Error Message on Failure |
+|---|---|---|---|
+| `title` | String | Trimmed, Min 3 chars, Max 100 chars | "Title must be at least 3 characters" |
+| `repoUrl` | String | Valid URL matching `/^https:\/\/(www\.)?github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/` | "Must be a valid GitHub repository URL (e.g., https://github.com/owner/repo)" |
+| `liveUrl` | String | **Mandatory**, Trimmed, Valid URL matching `/^https:\/\/.+/` | "Live demo link must use secure https:// protocol" |
+| `description` | String | Trimmed, Min 20 chars, Max 3000 chars | "Description must be at least 20 characters" |
+
+Review payloads are similarly validated:
+- `status`: Must strictly match either `"APPROVED"` or `"REJECTED"`.
+- `reviewNotes`: Optional string, trimmed, capped at 2000 characters.
+
+### 3. Anti-Spam Rate Limiting (HTTP 429 Too Many Requests)
+
+The `POST /api/v1/projects` intake route is wrapped with `express-rate-limit`:
+- **Rolling Window**: 2 minutes (120 seconds).
+- **Submission Cap**: Maximum of 3 submissions per window per student account (keyed by authenticated user ID or IP).
+- **Cooldown Feedback**: When exceeded, the middleware returns `HTTP 429 Too Many Requests` with a calculated `retryAfterSeconds` property, allowing the client to display an active countdown timer.
+
+### 4. One-Time Final Review Decision (Review Immutability)
+
+Evaluation decisions cannot be tampered with or altered after submission:
+- Mentors and Admins can only evaluate submissions whose current status is `PENDING`.
+- Once a project receives an `APPROVED` or `REJECTED` decision with feedback notes, the status, `reviewerId`, `reviewNotes`, and timestamp are recorded permanently.
+- Any subsequent attempt to call `PATCH /api/v1/projects/:id/review` on an evaluated project is rejected with `HTTP 400 Bad Request`:
+  ```json
+  {
+    "success": false,
+    "message": "This project has already been reviewed. Review decisions are final and cannot be modified."
+  }
+  ```
+
+### 5. Account Governance: Suspended vs. Banned Logic
+
+- **BANNED (Total Expulsion / Hard Revocation)**:
+  - Users with `status = "BANNED"` are rejected at authentication (`POST /api/v1/auth/login`) with `HTTP 403 Forbidden` (`"Your account has been permanently banned. Access is revoked."`).
+  - Existing JWT tokens encountering `authGuard` are terminated immediately.
+- **SUSPENDED (Read-Only Access)**:
+  - Suspended users are permitted to authenticate and view historical submissions (`GET /my-submissions`, `GET /my-stats`, `GET /projects`, `GET /projects/stats`).
+  - Mutation endpoints are blocked: suspended students cannot submit new projects (`POST /projects` returns 403), and suspended mentors cannot evaluate submissions (`PATCH /projects/:id/review` returns 403).
+- **Role Immutability**:
+  - Roles cannot be mutated on existing accounts. Administrators can update user account statuses (`ACTIVE`, `SUSPENDED`, `BANNED`), but role escalation or reassignment is prohibited.
+
+---
+
 ## Technology Stack
 
 - **Runtime**: Node.js (v18 or higher recommended)
 - **Language**: TypeScript (strict mode enabled)
 - **Framework**: Express.js 4.21
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (Neon Cloud / Local)
 - **ORM**: Prisma ORM 6.19
 - **Validation**: Zod 3.24
 - **Authentication**: JSON Web Tokens (`jsonwebtoken`), `bcrypt` (12 salt rounds), `cookie-parser`
@@ -136,6 +215,7 @@ Configure the variables according to your environment:
 | `REFRESH_TOKEN_EXPIRES_IN` | No | `30d` | Refresh token lifespan |
 | `FRONTEND_URL` | Yes | `http://localhost:3000` | Allowed origin for CORS headers |
 
+
 ---
 
 ## Database Setup and Seeding
@@ -152,7 +232,7 @@ Generate the Prisma Client and apply migrations to your database:
 # Generate Prisma Client
 npx prisma generate
 
-# Apply pending migrations or push schema directly
+# Apply pending schema changes
 npx prisma db push
 ```
 
@@ -162,7 +242,7 @@ On startup, `src/server.ts` automatically invokes `src/app/utils/seedAdmin.ts`. 
 
 1. **Default Administrator**:
    - Email: `admin@reviewportal.com`
-   - Password: `Admin123` (or the value set in `ADMIN_PASSWORD`)
+   - Password: `Admin123`
    - Role: `ADMIN`
 
 2. **Default Mentor**:
@@ -177,6 +257,8 @@ On startup, `src/server.ts` automatically invokes `src/app/utils/seedAdmin.ts`. 
 
 4. **Sample Project**:
    - Title: `Microservices Order Processing Pipeline`
+   - Repo URL: `https://github.com/alexhunter/order-processing-pipeline`
+   - Live URL: `https://order-processing-pipeline.vercel.app`
    - Status: `PENDING`
    - Associated with the default student, ready for immediate review testing.
 
@@ -230,37 +312,6 @@ Expected response:
 
 ---
 
-## Business Rules and Enforcements
-
-The backend enforces several core domain constraints:
-
-### 1. Duplicate Submission Prevention
-- A student cannot submit a project with a repository URL they have already submitted while that submission is currently `PENDING` or `APPROVED`.
-- If a student's prior submission with that repository was `REJECTED`, they are permitted to re-submit with an updated description and revisions.
-
-### 2. Submission Rate Limiting
-- The `POST /api/v1/projects` endpoint is protected by an `express-rate-limit` middleware (`submissionRateLimiter`).
-- Each user/IP is capped at a maximum of 3 submissions every 2 minutes to prevent bot flooding.
-
-### 3. One-Time Final Review Decision
-- An evaluation decision (`APPROVED` or `REJECTED`) is permanent.
-- Once a project is reviewed, its status is finalized along with the reviewer's ID and review notes.
-- Subsequent calls to `PATCH /api/v1/projects/:id/review` for that project return an HTTP 400 Bad Request indicating the project has already been evaluated.
-
-### 4. Account Governance: Suspended vs Banned
-- **BANNED (Total Revocation)**:
-  - Users with `status = "BANNED"` are rejected immediately at login (`POST /api/v1/auth/login`) with HTTP 403 Forbidden.
-  - Any active JWT tokens encountering `authGuard` are immediately rejected with HTTP 403.
-- **SUSPENDED (Read-Only Access)**:
-  - Suspended accounts may log in and inspect their previous records (`GET /my-submissions`, `GET /my-stats`, `GET /projects`, `GET /projects/stats`).
-  - Mutation endpoints are blocked: suspended students cannot submit new projects (`POST /projects` returns 403), and suspended mentors cannot evaluate submissions (`PATCH /projects/:id/review` returns 403).
-
-### 5. Role Immutability
-- User roles (`ADMIN`, `MENTOR`, `STUDENT`) cannot be modified after account creation.
-- Administrators can toggle user account status (`ACTIVE`, `SUSPENDED`, `BANNED`), but role mutation is prohibited to prevent unauthorized privilege escalation.
-
----
-
 ## API Reference
 
 All application endpoints are mounted under `/api/v1`.
@@ -280,7 +331,7 @@ All application endpoints are mounted under `/api/v1`.
 
 | Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| `POST` | `/projects` | STUDENT | Submit a new project (title, repoUrl, liveUrl, description). Rate-limited. |
+| `POST` | `/projects` | STUDENT | Submit a new project (title, repoUrl, liveUrl, description). Rate-limited. Enforces strict multi-field duplicate prevention. |
 | `GET` | `/projects/my-submissions` | STUDENT | List submissions submitted by the calling student |
 | `GET` | `/projects/my-stats` | STUDENT | Aggregate metrics (total, pending, approved, rejected) for the student |
 | `GET` | `/projects` | MENTOR, ADMIN | List all platform submissions with server pagination, search, and status filter |
@@ -348,7 +399,7 @@ Error responses handled by `globalErrorHandler` return predictable structures:
   "errorSources": [
     {
       "path": "repoUrl",
-      "message": "Invalid repository URL format"
+      "message": "Must be a valid GitHub repository URL (e.g., https://github.com/owner/repo)"
     }
   ],
   "stack": "Error: ... (in development mode only)"
