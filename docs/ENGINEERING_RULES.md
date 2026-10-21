@@ -84,9 +84,7 @@ This document defines the non-negotiable engineering principles, code organizati
 
 ---
 
----
-
-## 8. Zero Dead Code & Unused Feature Pruning Protocol
+## 7. Zero Dead Code & Unused Feature Pruning Protocol
 
 - **Mandatory Dead Code Elimination**: No unused models, dead utility files, obsolete endpoints, or zombie functions are permitted in the codebase.
 - **Pre-Removal Analysis Rule**: Before deleting any code, trace all imports, callers, and database relations to verify that it is 100% unused and does not break active dependencies.
@@ -96,7 +94,7 @@ This document defines the non-negotiable engineering principles, code organizati
   - Remove orphaned routes, controllers, and validation schemas.
 - **Cleanliness Standard**: Never leave dead code "for later" or commented-out legacy blocks. An engineered codebase must be lean, intentional, and immediately understandable to any reviewer.
 
-## 9. Execution Phasing Protocol
+## 8. Execution Phasing Protocol
 
 - Code must be implemented **one feature at a time**.
 - Before proceeding to the next feature:
@@ -106,7 +104,7 @@ This document defines the non-negotiable engineering principles, code organizati
 
 ---
 
-## 10. Git Push Restriction Protocol
+## 9. Git Push Restriction Protocol
 
 - **Zero Autonomous Git Pushes**: AI agents and automated scripts must **NEVER** run `git push` to GitHub or any remote repository.
 - **Manual User Push Only**: All remote synchronization (`git push origin main` or other branches) must be performed manually by the repository owner from their terminal. Agents are only permitted to make local commits (`git commit`) when appropriate.

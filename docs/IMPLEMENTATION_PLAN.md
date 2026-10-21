@@ -35,7 +35,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 | Promote User / Change Role | No | No | No (Disabled: Roles are immutable) |
 | Manage User Account Status (`ACTIVE`, `SUSPENDED`, `BANNED`) | No | No | Yes |
 | View Profile Details (Email, Role, Status) in Settings | Yes (Read-only) | Yes (Read-only) | Yes (Read-only) |
-| Change Password in Settings | No (Disabled) | No (Disabled) | No (Disabled) |
+| Change Password in Settings | Yes (`POST /api/v1/auth/change-password`) | Yes (`POST /api/v1/auth/change-password`) | Yes (`POST /api/v1/auth/change-password`) |
 
 ---
 
@@ -53,7 +53,7 @@ The platform defines 3 explicit roles: `ADMIN`, `MENTOR`, and `STUDENT`.
 
 3. **Settings Page Specification**:
    - In `/dashboard/settings`, users can view their profile identity (Name, Email, Role, Status, Creation Date).
-   - Password changes are explicitly disabled/removed as requested.
+   - Self-service password changes are supported via `POST /api/v1/auth/change-password` with current and new password validation.
 
 4. **Duplicate Submission Rule**:
    - A student cannot submit the same GitHub repository URL while they already have an active `PENDING` or `APPROVED` project.
